@@ -7,6 +7,8 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 int lcd_key     = 0;
 int adc_key_in  = 0;
 int lastActionTime = 0;
+int diff = 0;
+int prev_millis = 0;
 #define btnRIGHT  0
 #define btnUP     1
 #define btnDOWN   2
@@ -14,14 +16,19 @@ int lastActionTime = 0;
 #define btnSELECT 4
 #define btnNONE   5
 
+#define DISABLE_TIMER1 1
+#define DISABLE_TIMER2 1
+#define DISABLE_SERIAL 1
+#define DISABLE_ADC 0
+#define DISABLE_WIRE 0
+#define DISABLE_SPI 1
+#define ALLOW_SLEEP 1
 
 // read the buttons
 int read_LCD_buttons()
 {
- adc_key_in = analogRead(0);      // read the value from the sensor 
- // my buttons when read are centered at these valies: 0, 144, 329, 504, 741
- // we add approx 50 to those values and check to see if we are close
- if (adc_key_in > 1000) return btnNONE; // We make this the 1st option for speed reasons since it will be the most likely result
+ adc_key_in = analogRead(0);
+ if (adc_key_in > 1000) return btnNONE; 
  // For V1.1 us this threshold
  if (adc_key_in < 50)   return btnRIGHT;  
  if (adc_key_in < 250)  return btnUP; 
@@ -29,24 +36,15 @@ int read_LCD_buttons()
  if (adc_key_in < 650)  return btnLEFT; 
  if (adc_key_in < 850)  return btnSELECT;  
 
- // For V1.0 comment the other threshold and use the one below:
-/*
- if (adc_key_in < 50)   return btnRIGHT;  
- if (adc_key_in < 195)  return btnUP; 
- if (adc_key_in < 380)  return btnDOWN; 
- if (adc_key_in < 555)  return btnLEFT; 
- if (adc_key_in < 790)  return btnSELECT;   
-*/
 
-
- return btnNONE;  // when all others fail, return this...
+ return btnNONE;
 }
 
 void setup()
 {
  pinMode(10, OUTPUT);
  digitalWrite(10, HIGH);
- lcd.begin(16, 2);              // start the library
+ lcd.begin(16, 2);              
  lcd.setCursor(0,0);
  lcd.print("Push the buttons"); // print a simple message
  
@@ -61,45 +59,42 @@ void wakeUpNow(){
 void markAction(){
   digitalWrite(10, HIGH);
   lcd.display();
-  lastActionTime = millis()/1000;
-}
-
-void sleepNow()         // here we put the arduino to sleep
-{
-      
-    set_sleep_mode(SLEEP_MODE_ADC);   // sleep mode is set here
- 
-    sleep_enable();          // enables the sleep bit in the mcucr register
-                             // so sleep is possible. just a safety pin
- 
-    attachInterrupt(A0,wakeUpNow, CHANGE); 
-    sleep_mode();            // here the device is actually put to sleep!!                  // THE PROGRAM CONTINUES FROM HERE AFTER WAKING UP
- 
-    sleep_disable();         // first thing after waking from sleep:
-                             // disable sleep...
-    detachInterrupt(A0);      
+  lastActionTime = (millis()-diff)/1000;
 }
 
 void checkIdleTime(){
-  if(millis()/1000 >= lastActionTime+5){
-    //digitalWrite(10, LOW);
-    //lcd.noDisplay();
+  if((millis()-diff)/1000 >= lastActionTime+5){
 
+    if(ALLOW_SLEEP){
+      digitalWrite(10, LOW);
+      lcd.noDisplay();
+    }
+    prev_millis = millis();
     //shut off extra things
-    Narcoleptic.disableTimer1();
-  Narcoleptic.disableTimer2();
-  Narcoleptic.disableSerial();
-  //Narcoleptic.disableADC();
-  //Narcoleptic.disableWire();
-  Narcoleptic.disableSPI();
-  Narcoleptic.delay(5000);
+    if(DISABLE_TIMER1)
+      Narcoleptic.disableTimer1();
+    if(DISABLE_TIMER2)
+      Narcoleptic.disableTimer2();
+    if(DISABLE_SERIAL)
+      Narcoleptic.disableSerial();
+    if(DISABLE_ADC)
+      Narcoleptic.disableADC();
+    if(DISABLE_WIRE)
+      Narcoleptic.disableWire();
+    if(DISABLE_SPI)
+      Narcoleptic.disableSPI();
+
+    //Use watchdog timer
+    if(ALLOW_SLEEP)
+      Narcoleptic.delay(50);
+    diff = millis() - prev_millis;
   }
 }
  int slept =0;
 void loop()
 {
  lcd.setCursor(9,1);            // move cursor to second line "1" and 9 spaces over
- lcd.print(millis()/1000);      // display seconds elapsed since power-up
+ lcd.print((millis()-diff)/1000);      // display seconds elapsed since power-up
  checkIdleTime();
  
 
