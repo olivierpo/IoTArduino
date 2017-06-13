@@ -1,5 +1,6 @@
 #include <LiquidCrystal.h>
 #include <avr/sleep.h>
+#include <Narcoleptic.h>
 
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
@@ -48,7 +49,7 @@ void setup()
  lcd.begin(16, 2);              // start the library
  lcd.setCursor(0,0);
  lcd.print("Push the buttons"); // print a simple message
-
+ 
  attachInterrupt(A0, wakeUpNow, CHANGE);
  
 }
@@ -66,7 +67,7 @@ void markAction(){
 void sleepNow()         // here we put the arduino to sleep
 {
       
-    set_sleep_mode(SLEEP_MODE_PWR_DOWN);   // sleep mode is set here
+    set_sleep_mode(SLEEP_MODE_ADC);   // sleep mode is set here
  
     sleep_enable();          // enables the sleep bit in the mcucr register
                              // so sleep is possible. just a safety pin
@@ -80,9 +81,18 @@ void sleepNow()         // here we put the arduino to sleep
 }
 
 void checkIdleTime(){
-  if(millis()/1000 > lastActionTime+10){
-    digitalWrite(10, LOW);
-    lcd.noDisplay();
+  if(millis()/1000 >= lastActionTime+5){
+    //digitalWrite(10, LOW);
+    //lcd.noDisplay();
+
+    //shut off extra things
+    Narcoleptic.disableTimer1();
+  Narcoleptic.disableTimer2();
+  Narcoleptic.disableSerial();
+  //Narcoleptic.disableADC();
+  //Narcoleptic.disableWire();
+  Narcoleptic.disableSPI();
+  Narcoleptic.delay(5000);
   }
 }
  int slept =0;
@@ -90,11 +100,6 @@ void loop()
 {
  lcd.setCursor(9,1);            // move cursor to second line "1" and 9 spaces over
  lcd.print(millis()/1000);      // display seconds elapsed since power-up
- if(millis()/1000 >= 5 && slept == 0){
- delay(100);
- slept = 1;
- //sleepNow();
- }
  checkIdleTime();
  
 
