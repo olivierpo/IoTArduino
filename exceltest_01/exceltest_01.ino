@@ -1,7 +1,7 @@
 unsigned long int milli_time;    //variable to hold the time
 float voltage;         //variable to hold the voltage form A0
 void setup() {
-  Serial.begin(9600);               //Fastest baudrate
+  Serial.begin(128000);               //Fastest baudrate
   Serial.println("CLEARDATA");        //This string is defined as a 
                                       // commmand for the Excel VBA 
                                       // to clear all the rows and columns

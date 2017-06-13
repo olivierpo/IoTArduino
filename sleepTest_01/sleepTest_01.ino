@@ -9,6 +9,7 @@ int adc_key_in  = 0;
 int lastActionTime = 0;
 int diff = 0;
 int prev_millis = 0;
+bool wokeup = true;
 #define btnRIGHT  0
 #define btnUP     1
 #define btnDOWN   2
@@ -42,13 +43,14 @@ int read_LCD_buttons()
 
 void setup()
 {
- pinMode(10, OUTPUT);
- digitalWrite(10, HIGH);
- lcd.begin(16, 2);              
- lcd.setCursor(0,0);
- lcd.print("Push the buttons"); // print a simple message
- 
- attachInterrupt(A0, wakeUpNow, CHANGE);
+  //Serial.begin(9600);
+  pinMode(10, OUTPUT);
+  digitalWrite(10, HIGH);
+  lcd.begin(16, 2);              
+  lcd.setCursor(0,0);
+  lcd.print("Push the buttons"); // print a simple message
+  
+  attachInterrupt(A0, wakeUpNow, CHANGE);
  
 }
 
@@ -57,6 +59,7 @@ void wakeUpNow(){
 }
 
 void markAction(){
+  wokeup = true;
   digitalWrite(10, HIGH);
   lcd.display();
   lastActionTime = (millis()-diff)/1000;
@@ -64,12 +67,15 @@ void markAction(){
 
 void checkIdleTime(){
   if((millis()-diff)/1000 >= lastActionTime+5){
-
+    
     if(ALLOW_SLEEP){
-      digitalWrite(10, LOW);
-      lcd.noDisplay();
+      //digitalWrite(10, LOW);
+      //lcd.noDisplay();
     }
-    prev_millis = millis();
+    if(wokeup)
+      prev_millis = (millis()-diff);
+
+    wokeup = false;
     //shut off extra things
     if(DISABLE_TIMER1)
       Narcoleptic.disableTimer1();
@@ -88,6 +94,13 @@ void checkIdleTime(){
     if(ALLOW_SLEEP)
       Narcoleptic.delay(50);
     diff = millis() - prev_millis;
+
+    Serial.print("millis: ");
+    Serial.print(millis());
+    Serial.print(" -- prev_millis: ");
+    Serial.print(prev_millis);
+    Serial.print(" -- diff: ");
+    Serial.println(diff);
   }
 }
  int slept =0;
