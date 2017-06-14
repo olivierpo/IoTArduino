@@ -1,6 +1,7 @@
 #include <LiquidCrystal.h>
 #include <avr/sleep.h>
 #include <Narcoleptic.h>
+#include <avr/wdt.h>
 
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
@@ -24,6 +25,10 @@ bool wokeup = true;
 #define DISABLE_WIRE 0
 #define DISABLE_SPI 1
 #define ALLOW_SLEEP 1
+
+const uint8_t SleepMode = SLEEP_MODE_PWR_DOWN;
+const uint8_t SleepTime = WDTO_120MS; // WDTO_15MS, WDTO_30MS, WDTO_60MS, WDTO_120MS, WDTO_250MS, WDTO_500MS, WDTO_1S, WDTO_2S, WDTO_4S
+
 
 // read the buttons
 int read_LCD_buttons()
@@ -49,13 +54,130 @@ void setup()
   lcd.begin(16, 2);              
   lcd.setCursor(0,0);
   lcd.print("Push the buttons"); // print a simple message
-  
-  attachInterrupt(A0, wakeUpNow, CHANGE);
  
 }
 
-void wakeUpNow(){
+void sleepNow(){
+  #ifdef BODSE
+  // Turn off BOD in sleep (Arduino mega 2560 BOD triggers a RESET on activation)
+  MCUCR |= _BV(BODSE);
+  MCUCR |= _BV(BODS);
+  #endif
   
+  MCUSR = 0; //clear the MCU status register
+  #ifdef WDTCSR
+    WDTCSR &= ~_BV(WDE);
+    WDTCSR = _BV(WDIF) | _BV(WDIE) | _BV(WDCE);
+  #else
+    WDTCR &= ~_BV(WDE);
+    WDTCR = _BV(WDIF) | _BV(WDIE) | _BV(WDCE);
+  #endif
+    
+  wdt_enable(SleepTime);
+  wdt_reset(); //reset the watchdog timer
+  #ifdef WDTCSR
+    WDTCSR |= _BV(WDIE); //make sure the watchdog timer doesnt trigger a device reset
+  #else
+    WDTCR |= _BV(WDIE);
+  #endif
+  set_sleep_mode(SleepMode);
+
+  // Disable all interrupts
+  uint8_t SREGcopy = SREG; 
+  cli();
+  
+  #ifdef EIMSK
+    uint8_t EIMSKcopy = EIMSK; EIMSK = 0; //disable internal interrupt mask register
+  #endif
+  #ifdef PCMSK0
+    uint8_t PCMSK0copy = PCMSK0; PCMSK0 = 0; //disable pin change mask registers
+  #endif
+  #ifdef PCMSK1
+    uint8_t PCMSK1copy = PCMSK1; PCMSK1 = 0;
+  #endif
+  #ifdef PCMSK2
+    uint8_t PCMSK2copy = PCMSK2; PCMSK2 = 0;
+  #endif
+  #ifdef TIMSK0
+    uint8_t TIMSK0copy = TIMSK0; TIMSK0 = 0;//disable timer interrupt mask registers
+  #endif
+  #ifdef TIMSK1
+    uint8_t TIMSK1copy = TIMSK1; TIMSK1 = 0;
+  #endif
+  #ifdef TIMSK2
+    uint8_t TIMSK2copy = TIMSK2; TIMSK2 = 0;
+  #endif
+  #ifdef SPCR
+    uint8_t SPCRcopy = SPCR; SPCR &= ~_BV(SPIE); //disable SPI interrupt enable to 0
+  #endif
+  #ifdef UCSR0B
+    uint8_t UCSR0Bcopy = UCSR0B; UCSR0B &= ~(_BV(RXCIE0) | _BV(TXCIE0) | _BV(UDRIE0)); //RXCIE0: disable complete interrupts. --- TXCIE0: disable transmission complete interrupts --- UDRIE0: disable data register empty interrupts
+  #endif
+  #ifdef TWCR
+    uint8_t TWCRcopy = TWCR; TWCR &= ~_BV(TWIE); //disable two wire interface interrupt
+  #endif
+  #ifdef ACSR
+    uint8_t ACSRcopy = ACSR; ACSR &= ~_BV(ACIE); //disable analog comparator interrupt
+  #endif
+  #ifdef ADCSRA
+    uint8_t ADCSRAcopy = ADCSRA; ADCSRA &= ~_BV(ADIE); //disable adc conversion interrupt
+  #endif
+  #if defined(SPMCSR) && defined(SPMIE)
+    uint8_t SPMCSRcopy = SPMCSR; SPMCSR &= ~_BV(SPMIE); //disable spm interrupt (store program memory)
+  #endif
+
+  sei(); //set the bit and reenable interrupt for watchdog timer
+  sleep_mode();            // here the device is actually put to sleep!!
+  wdt_disable();           // first thing after waking from sleep: disable watchdog...
+
+    // Reenable all interrupts
+  #if defined(SPMCSR) && defined(SPMIE)
+    SPMCSR = SPMCSRcopy;
+  #endif
+  #ifdef ADCSRA
+    ADCSRA = ADCSRAcopy;
+  #endif
+  #ifdef ACSR
+    ACSR = ACSRcopy;
+  #endif
+  #ifdef TWCR
+    TWCR = TWCRcopy;
+  #endif
+  #ifdef UCSR0B
+    UCSR0B = UCSR0Bcopy;
+  #endif
+  #ifdef SPCR
+    SPCR = SPCRcopy;
+  #endif
+  #ifdef TIMSK2
+    TIMSK2 = TIMSK2copy;
+  #endif
+  #ifdef TIMSK1
+    TIMSK1 = TIMSK1copy;
+  #endif
+  #ifdef TIMSK0
+    TIMSK0 = TIMSK0copy;
+  #endif
+  #ifdef PCMSK2
+    PCMSK2 = PCMSK2copy;
+  #endif
+  #ifdef PCMSK1
+    PCMSK1 = PCMSK1copy;
+  #endif
+  #ifdef PCMSK0
+    PCMSK0 = PCMSK0copy;
+  #endif
+  #ifdef EIMSK
+    EIMSK = EIMSKcopy;
+  #endif
+  
+  SREG = SREGcopy;
+    
+  #ifdef WDTCSR
+    WDTCSR &= ~_BV(WDIE);
+  #else
+    WDTCR &= ~_BV(WDIE);
+  #endif
 }
 
 void markAction(){
@@ -69,8 +191,8 @@ void checkIdleTime(){
   if((millis()-diff)/1000 >= lastActionTime+5){
     
     if(ALLOW_SLEEP){
-      //digitalWrite(10, LOW);
-      //lcd.noDisplay();
+      digitalWrite(10, LOW);
+      lcd.noDisplay();
     }
     if(wokeup)
       prev_millis = (millis()-diff);
@@ -92,7 +214,8 @@ void checkIdleTime(){
 
     //Use watchdog timer
     if(ALLOW_SLEEP)
-      Narcoleptic.delay(50);
+      sleepNow();
+     
     diff = millis() - prev_millis;
 
     Serial.print("millis: ");
@@ -103,7 +226,7 @@ void checkIdleTime(){
     Serial.println(diff);
   }
 }
- int slept =0;
+
 void loop()
 {
  lcd.setCursor(9,1);            // move cursor to second line "1" and 9 spaces over
