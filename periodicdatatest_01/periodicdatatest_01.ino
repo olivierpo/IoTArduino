@@ -28,7 +28,7 @@ bool wokeup = true;
 
 const uint8_t SleepMode = SLEEP_MODE_PWR_DOWN;
 const uint8_t SleepTime = WDTO_250MS; // WDTO_15MS, WDTO_30MS, WDTO_60MS, WDTO_120MS, WDTO_250MS, WDTO_500MS, WDTO_1S, WDTO_2S, WDTO_4S
-
+#define SLEEPDURATION 250 //must equal above sleeptime
 
 // read the buttons
 int read_LCD_buttons()
@@ -48,10 +48,12 @@ int read_LCD_buttons()
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(4800);
   pinMode(10, OUTPUT);
   digitalWrite(10, HIGH);
-  lcd.begin(16, 2);              
+  lcd.begin(16, 2);  
+  Serial.println("CLEARDATA"); 
+  Serial.println("LABEL,Computer Time, Arduino Time (Millis.)");           
 }
 
 void sleepNow(){
@@ -184,7 +186,13 @@ void markAction(){
   lastActionTime = (millis()-diff)/1000;
 }
 
-void checkIdleTime(){
+int sleptTimeMillis = 0;
+int previousDraw = 0;
+
+/**
+ * If enough time has passed since last action, disable unneeded peripherals, calibrate to correct time and sleep.
+ */
+void powerSaveMode(){
   if((millis()-diff)/1000 >= lastActionTime+5){
     
     if(ALLOW_SLEEP){
@@ -200,8 +208,10 @@ void checkIdleTime(){
       Narcoleptic.disableTimer1();
     if(DISABLE_TIMER2)
       Narcoleptic.disableTimer2();
-    if(DISABLE_SERIAL)
-      //Narcoleptic.disableSerial();
+    if(DISABLE_SERIAL){
+      Serial.end();
+      Narcoleptic.disableSerial();
+    }
     if(DISABLE_ADC)
       Narcoleptic.disableADC();
     if(DISABLE_WIRE)
@@ -212,7 +222,7 @@ void checkIdleTime(){
     if(ALLOW_SLEEP){
       sleepNow();
     }
-     
+    sleptTimeMillis += SLEEPDURATION;
     diff = millis() - prev_millis;
 //    Serial.flush();
 //    Serial.print("millis: ");
@@ -224,12 +234,23 @@ void checkIdleTime(){
   }
 }
 
+int prevMultiple;
+
 void loop()
 {
+ int currMultiple = ((sleptTimeMillis + millis())/1000);
+ if( currMultiple%5 == 0 && prevMultiple != currMultiple){
+    Narcoleptic.enableSerial();
+    while(!Serial){};
+    Serial.begin(4800);
+    Serial.print("DATA,TIME,");
+    Serial.println(millis());
+    prevMultiple = currMultiple;
+ }
  lcd.setCursor(9,1);            // move cursor to second line "1" and 9 spaces over
  lcd.print((millis()-diff)/1000);      // display seconds elapsed since power-up (minus time spent asleep)
  checkIdleTime();
-
+ 
  lcd.setCursor(0,1);            // move to the begining of the second line
  lcd_key = read_LCD_buttons();  // read the buttons
 

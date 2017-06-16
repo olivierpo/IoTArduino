@@ -5,15 +5,19 @@ void setup() {
   Serial.println("CLEARDATA");        //This string is defined as a 
                                       // commmand for the Excel VBA 
                                       // to clear all the rows and columns
-  Serial.println("LABEL,Computer Time,Time (Milli Sec.),Volt, Volt1, Volt2, Volt3, Volt4, Volt5, Volt6");  
+  Serial.println("LABEL,Computer Time, Sinus (Wave),Volt, Volt1, Volt2, Volt3, Volt4, Volt5, Volt6");  
                                       //LABEL command creates label for 
                                       // columns in the first row with bold font
 }
+
+int x = 0;
+int y = 0;
 void loop() {
-  milli_time = millis();
+  x++;
+  y = 100*sin(50*x);
   voltage = 5.0 * analogRead(A0) / 1024.0;
   Serial.print("DATA,TIME,");
-  Serial.print(milli_time);
+  Serial.print(y);
   Serial.print(",");
   Serial.print(voltage);
   Serial.print(",");
