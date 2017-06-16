@@ -249,7 +249,7 @@ void loop()
  }
  lcd.setCursor(9,1);            // move cursor to second line "1" and 9 spaces over
  lcd.print((millis()-diff)/1000);      // display seconds elapsed since power-up (minus time spent asleep)
- checkIdleTime();
+ powerSaveMode();
  
  lcd.setCursor(0,1);            // move to the begining of the second line
  lcd_key = read_LCD_buttons();  // read the buttons
